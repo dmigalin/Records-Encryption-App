@@ -24,6 +24,16 @@ class AbstractEncryption(ABC):
         raise NotImplementedError
 
 
+class AbstractHashing(ABC):
+    @abstractmethod
+    async def get_password_hash():
+        raise NotImplementedError
+    
+    @abstractmethod
+    async def verify_password():
+        raise NotImplementedError
+
+
 class SQLAlchemyRepository(AbstractDBRepository):
     model = None
 

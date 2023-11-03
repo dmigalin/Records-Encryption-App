@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from repository.sqlalchemy import SQLAlchemyRepository
 from repository.mongo import MongoRepository
 from repository.encrypt import EncryptionRepository
+from repository.hashing import HashingRepository
+
 from schemas.texts import TextSchemaCreate
 from models.texts import Text
 from config import REMOVE_INTERVALS as RMI
@@ -15,24 +17,32 @@ from config import REMOVE_INTERVALS as RMI
 class TextService:
     def __init__(self, sqlalchemy_repo: SQLAlchemyRepository,
             mongo_repo: MongoRepository,
-            encrypt_repo: EncryptionRepository):
+            encrypt_repo: EncryptionRepository,
+            hashing_repo: HashingRepository):
         self.sqlalchemy_repo: SQLAlchemyRepository = sqlalchemy_repo()
         self.mongo_repo: MongoRepository = mongo_repo()
         self.encrypt_repo: EncryptionRepository = encrypt_repo()
+        self.hashing_repo: HashingRepository = hashing_repo()
 
 
     async def create_record(self, session:AsyncSession, data:TextSchemaCreate) -> dict:
         data = data.model_dump()
         encrypt = self.encrypt_repo.encrypt(data['text'])
+        plain_password = encrypt['secret_key'][:-1]
+        hashed_password = self.hashing_repo.get_password_hash(plain_password)
+        
         document = {
-            'password':encrypt['secret_key'][:-1],
-            'text':encrypt['secret_data']}
+            'password':hashed_password,
+            'text':encrypt['secret_data']
+            }
+        
         object_id = await self.mongo_repo.write(document)
         new_text=Text(user_id=object_id,
                       date=time.strftime('%d.%m.%Y',time.localtime()),
-                      time=time.strftime('%H:%M:%S',time.localtime()))
+                      time=time.strftime('%H:%M:%S',time.localtime())
+                      )
         await self.sqlalchemy_repo.write(session, new_text)
-        return {'object_id': object_id, 'password': document['password']}
+        return {'object_id': object_id, 'password': plain_password}
 
 
     async def get_record(self, object_id:str,password:str) -> FileResponse:
@@ -40,7 +50,8 @@ class TextService:
         if secret_data == None:
             raise HTTPException(
                 status_code=404, detail='Text with this ID does not exsist.')
-        if secret_data['password'] == password:
+        if self.hashing_repo.verify_password(
+            password,secret_data['password']):
             password = password + '='
             secret_data = self.encrypt_repo.decrypt(
                 password,

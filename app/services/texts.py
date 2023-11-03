@@ -2,6 +2,7 @@ import time
 
 from fastapi import HTTPException
 from fastapi.responses import FileResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from repository.sqlalchemy import SQLAlchemyRepository
 from repository.mongo import MongoRepository
@@ -9,6 +10,7 @@ from repository.encrypt import EncryptionRepository
 from schemas.texts import TextSchemaCreate
 from models.texts import Text
 from config import REMOVE_INTERVALS as RMI
+
 
 class TextService:
     def __init__(self, sqlalchemy_repo: SQLAlchemyRepository,
@@ -19,7 +21,7 @@ class TextService:
         self.encrypt_repo: EncryptionRepository = encrypt_repo()
 
 
-    async def create_record(self, data:TextSchemaCreate) -> dict:
+    async def create_record(self, session:AsyncSession, data:TextSchemaCreate) -> dict:
         data = data.model_dump()
         encrypt = self.encrypt_repo.encrypt(data['text'])
         document = {
@@ -29,7 +31,7 @@ class TextService:
         new_text=Text(user_id=object_id,
                       date=time.strftime('%d.%m.%Y',time.localtime()),
                       time=time.strftime('%H:%M:%S',time.localtime()))
-        await self.sqlalchemy_repo.write(new_text)
+        await self.sqlalchemy_repo.write(session, new_text)
         return {'object_id': object_id, 'password': document['password']}
 
 
@@ -53,7 +55,7 @@ class TextService:
             raise HTTPException(status_code=404,detail='Wrong Password.')
         
 
-    async def update_records(self):
+    async def update_records(self,session:AsyncSession):
         status = await self.sqlalchemy_repo.get_by_status()
         if status:
             for i in status:
@@ -61,7 +63,7 @@ class TextService:
                 if time.time() - time.mktime(
                     time.strptime(i[1]+i[2],'%d.%m.%Y%H:%M:%S')) > RMI: 
                     object_id = i[0]
-                    await self.sqlalchemy_repo.update_status(object_id)
+                    await self.sqlalchemy_repo.update_status(session,object_id)
                     await self.mongo_repo.delete(object_id)
                     await self.sqlalchemy_repo.del_file(object_id)
                     changes += 1

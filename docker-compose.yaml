@@ -13,8 +13,6 @@ services:
       - .env
     expose:
       - 8000
-    volumes:
-      - ./app/tests:/app/tests
     networks:
       - custom
 

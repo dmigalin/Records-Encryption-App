@@ -5,3 +5,4 @@ __pycache__
 requirements copy.txt
 Jira.py
 .vscode
+*.pytest_cache

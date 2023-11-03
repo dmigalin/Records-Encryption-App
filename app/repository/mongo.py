@@ -4,12 +4,6 @@ from db.mongo import mongodb
 from utils.repository import AbstractDBRepository
 
 
-
-
-
-
-
-
 class MongoRepository(AbstractDBRepository):
     @staticmethod
     async def write(document):

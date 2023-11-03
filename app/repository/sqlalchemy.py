@@ -3,7 +3,7 @@ from utils.repository import AbstractDBRepository
 from models.texts import Text
 from db.pgs import engine, async_session_maker, get_async_session
 
-from fastapi import Depends
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -14,10 +14,10 @@ class SQLAlchemyRepository(AbstractDBRepository):
     
     
     @staticmethod
-    async def write(data:str, session=async_session_maker):
-        async with session.begin() as session:
-            session.add(data)
+    async def write(session:AsyncSession, data:str):
+        session.add(data)
         await session.commit()
+
     
 
     @staticmethod
@@ -49,12 +49,11 @@ class SQLAlchemyRepository(AbstractDBRepository):
 
 
     @staticmethod
-    async def update_status(object_id,session=async_session_maker):
-        async with session.begin() as session:
-            old_text  =  await session.get(Text,object_id)
-            if not old_text:
-                return 404
-            old_text.status=False
+    async def update_status(session:AsyncSession,object_id):
+        old_text  =  await session.get(Text,object_id)
+        if not old_text:
+            return 404
+        old_text.status=False
         await session.commit()
         return 200
     
